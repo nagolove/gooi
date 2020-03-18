@@ -1,14 +1,64 @@
 require "gooi"
 
+gr = love.graphics
+kb = love.keyboard
+mo = love.mouse
+
+function width() return gr.getWidth() end
+function height() return gr.getHeight() end
+
+local inspect = require "inspect2"
+local cam = require "camera".new()
+local vector = require "vector"
+
+local drawList = {}
+
+function processDrawList()
+    for k, v in pairs(drawList) do
+        if type(v) == "function" then v() end
+    end
+    drawList = {}
+end
+
+local prevTouches = {}
+
+local touches = {}
+
+love.mouse.getX = function()
+    local x, y = cam:mousePosition()
+    return x
+end
+
+love.mouse.getY = function()
+    local x, y = cam:mousePosition()
+    return y
+end
+
+function love.touchmoved(id, x, y, dx, dy, _)
+    touches[id] = {x = x, y = y, dx = dx, dy = dy}
+end
+
+function love.touchreleased(id, x, y, dx, dy, _)
+    touches[id] = nil
+end
+
+function processTouches()
+    local i = 0
+    local tbl = {}
+    for k, v in pairs(touches) do
+        if i < 2 then
+            table.insert(tbl, v)
+            i = i + 1
+        end
+    end
+    if #tbl == 2 then
+        cam:move(-tbl[1].dx, -tbl[1].dy)
+    end
+end
+
 function love.load()
-  gr = love.graphics
-  kb = love.keyboard
-  mo = love.mouse
 
   gr.setBackgroundColor(0.5, 0.5, 0.5)
-
-  function width() return gr.getWidth() end
-  function height() return gr.getHeight() end
 
   imgDir = "/imgs/"
   fontDir = "/fonts/"
@@ -162,6 +212,7 @@ function love.load()
         gr.setBackgroundColor(randomColor())
         gooi.alert({text = "The background has changed!\ndeal with it!"})
       end):inverted(),
+
       gooi.newButton({text = "Confirm btn", icon = imgDir.."medal.png"}):right():secondary()
       :onRelease(function()
         gooi.confirm({
@@ -176,6 +227,7 @@ function love.load()
           cancelText = "Nope"
         })
       end),
+
       gooi.newSlider():border(3, "#00ff00"):fg({1, 1, 0}):danger(),
       gooi.newCheck({text = "Debug"})
         :setRadius(12, 10):bg(component.colors.orange)
@@ -199,74 +251,88 @@ function love.load()
 end
 
 function love.update(dt)
-  gooi.update(dt)
-  lbl2:setText(sli1:getValue())
+    processTouches()
+    gooi.update(dt)
 
-  -- Move itself:
-  joy1.x = (joy1.x + joy1:xValue() * dt * 200)
-  joy1.y = (joy1.y + joy1:yValue() * dt * 200)
+    lbl2:setText(sli1:getValue())
 
-  -- move ship with analog joystick:
-  ship.x = (ship.x + joyShip:xValue() * dt * 150)
-  ship.y = (ship.y + joyShip:yValue() * dt * 150)
-  if     kb.isDown("a") then ship.x = ship.x - dt * 150
-  elseif kb.isDown("d") then ship.x = ship.x + dt * 150 end
-  if     kb.isDown("w") then ship.y = ship.y - dt * 150
-  elseif kb.isDown("s") then ship.y = ship.y + dt * 150 end
-  
-  -- with digital:
-  local dir = joyShipDigital:direction()
-  if dir:match("l") then
-    ship.x = ship.x - dt * 150
-  elseif dir:match("r") then
-    ship.x = ship.x + dt * 150
-  end
+    -- Move itself:
+    joy1.x = (joy1.x + joy1:xValue() * dt * 200)
+    joy1.y = (joy1.y + joy1:yValue() * dt * 200)
 
-  if dir:match("t") then
-    ship.y = ship.y - dt * 150
-  elseif dir:match("b") then
-    ship.y = ship.y + dt * 150
-  end
+    -- move ship with analog joystick:
+    ship.x = (ship.x + joyShip:xValue() * dt * 150)
+    ship.y = (ship.y + joyShip:yValue() * dt * 150)
+    if     kb.isDown("a") then ship.x = ship.x - dt * 150
+    elseif kb.isDown("d") then ship.x = ship.x + dt * 150 end
+    if     kb.isDown("w") then ship.y = ship.y - dt * 150
+    elseif kb.isDown("s") then ship.y = ship.y + dt * 150 end
 
-  if ship.x > width() then ship.x = width() end
-  if ship.x < 0 then ship.x = width() end
-
-  -- Move bullets:
-  for i = #bullets, 1, -1 do
-    bullets[i].y = bullets[i].y - dt * 1400
-    if bullets[i].y < -100 then
-      table.remove(bullets, i)
+    -- with digital:
+    local dir = joyShipDigital:direction()
+    if dir:match("l") then
+        ship.x = ship.x - dt * 150
+    elseif dir:match("r") then
+        ship.x = ship.x + dt * 150
     end
-  end
 
-  lblCoords:setText("coords: "..joy1:xValue()..", "..joy1:yValue())
-  btnShot:setText(joyShipDigital:direction())
+    if dir:match("t") then
+        ship.y = ship.y - dt * 150
+    elseif dir:match("b") then
+        ship.y = ship.y + dt * 150
+    end
+
+    if ship.x > width() then ship.x = width() end
+    if ship.x < 0 then ship.x = width() end
+
+    -- Move bullets:
+    for i = #bullets, 1, -1 do
+        bullets[i].y = bullets[i].y - dt * 1400
+        if bullets[i].y < -100 then
+            table.remove(bullets, i)
+        end
+    end
+
+    lblCoords:setText("coords: "..joy1:xValue()..", "..joy1:yValue())
+    btnShot:setText(joyShipDigital:direction())
 end
 
 function love.draw()
-  -- Bullets:
-  for i = 1, #bullets do
-    local b = bullets[i]
-    gr.draw(imgBullet, b.x, b.y, 0, 4, 4,
-      imgBullet:getWidth() / 2,
-      imgBullet:getHeight() / 2)
-  end
+    cam:attach()
 
-  gr.setColor(0, 0, 0, 0.5)
-  gr.rectangle("line", pGame.x, pGame.y, pGame.w, pGame.h)
-  gr.rectangle("line", pGrid.x, pGrid.y, pGrid.w, pGrid.h)
+    -- Bullets:
+    for i = 1, #bullets do
+        local b = bullets[i]
+        gr.draw(imgBullet, b.x, b.y, 0, 4, 4,
+        imgBullet:getWidth() / 2,
+        imgBullet:getHeight() / 2)
+    end
 
-  gr.setColor(1, 1, 1)
-  gr.draw(ship.img, ship.x, ship.y, 0, 4, 4,
+    gr.setColor(0, 0, 0, 0.5)
+    gr.rectangle("line", pGame.x, pGame.y, pGame.w, pGame.h)
+    gr.rectangle("line", pGrid.x, pGrid.y, pGrid.w, pGrid.h)
+
+    gr.setColor(1, 1, 1)
+    gr.draw(ship.img, ship.x, ship.y, 0, 4, 4,
     ship.img:getWidth() / 2,
     ship.img:getHeight() / 2)
 
-  gooi.draw()
-  gr.print("FPS: "..love.timer.getFPS())
+    gooi.draw()
+    gr.print("FPS: "..love.timer.getFPS())
+
+    cam:detach()
+    processDrawList()
 end
 
 function love.mousereleased(x, y, button) gooi.released() end
 function love.mousepressed(x, y, button)  gooi.pressed() end
+
+function love.mousemoved(x, y, dx, dy, istouch)
+    --[[print("x, y, dx, dy", x, y, dx, dy)]]
+    if kb.isDown("lshift") then
+        cam:move(-dx, -dy)
+    end
+end
 
 function love.textinput(text)
   gooi.textinput(text)

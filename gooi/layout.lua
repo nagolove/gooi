@@ -3,6 +3,9 @@ layout.__index = layout
 layout.padding = 5
 layout.paddingGrid = 3
 
+-- [[
+-- spect - "grid", "game"
+-- ]]
 function layout.new(specs)
 	local l ={}
 	l.specs = specs
